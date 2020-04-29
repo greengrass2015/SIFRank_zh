@@ -2,14 +2,15 @@
 # -*- coding: utf-8 -*-
 # __author__ = "Sponge"
 # Date: 2019/6/19
-import numpy
+import numpy as np
 import torch
 import nltk
 from nltk.corpus import stopwords
+from collections import defaultdict
 english_punctuations = [',', '.', ':', ';', '?', '(', ')', '[', ']', '&', '!', '*', '@', '#', '$', '%']
 chinese_punctuations = '！？｡。＂＃＄％＆＇（）＊＋，－／：；＜＝＞＠［＼］＾＿｀｛｜｝～｟｠｢｣､、〃》「」『』【】〔〕〖〗〘〙〚〛〜〝〞〟〰〾〿–—‘’‛“”„‟…‧﹏.'
 stop_words = set(stopwords.words("english"))
-wnl=nltk.WordNetLemmatizer()
+# wnl=nltk.WordNetLemmatizer()
 # considered_tags = {'NN', 'NNS', 'NNP', 'NNPS', 'JJ','VBG'}
 considered_tags = {'n', 'np', 'ns', 'ni', 'nz','a','d','i','j','x','g'}
 class SentEmbeddings():
@@ -46,8 +47,10 @@ class SentEmbeddings():
         elif (self.embeddings_type == "elmo" and if_DS == True and if_EA == True):
             tokens_segmented = get_sent_segmented(text_obj.tokens)
             elmo_embeddings = self.word_embeddor.get_tokenized_words_embeddings(tokens_segmented)
-            elmo_embeddings = context_embeddings_alignment(elmo_embeddings, tokens_segmented)
-            elmo_embeddings = splice_embeddings(elmo_embeddings, tokens_segmented)
+            # elmo_embeddings = context_embeddings_alignment(elmo_embeddings, tokens_segmented)
+            # elmo_embeddings = splice_embeddings(elmo_embeddings, tokens_segmented)
+            elmo_embeddings = context_embeddings_alignment_v1(elmo_embeddings, tokens_segmented)
+            elmo_embeddings = splice_embeddings_v1(elmo_embeddings, tokens_segmented)
 
         # elif(self.embeddings_type=="elmo_transformer"):
         #     elmo_embeddings= self.word_embeddor.get_tokenized_words_embeddings([text_obj.tokens])
@@ -61,7 +64,9 @@ class SentEmbeddings():
 
         weight_list = get_weight_list(self.word2weight_pretrain, self.word2weight_finetune, text_obj.tokens, lamda=self.lamda, database=self.database)
 
-        sent_embeddings = get_weighted_average(text_obj.tokens, text_obj.tokens_tagged, weight_list, elmo_embeddings[0], embeddings_type=self.embeddings_type)
+        # sent_embeddings = get_weighted_average(text_obj.tokens, text_obj.tokens_tagged, weight_list, elmo_embeddings[0], embeddings_type=self.embeddings_type)
+        sent_embeddings = get_weighted_average(text_obj.tokens, text_obj.tokens_tagged, weight_list, elmo_embeddings,
+                                               embeddings_type=self.embeddings_type)
 
         for kc in text_obj.keyphrase_candidate:
             start = kc[1][0]
@@ -81,7 +86,7 @@ def context_embeddings_alignment(elmo_embeddings, tokens_segmented):
      <class 'list'>: [['今', '天', '天气', '真', '好', '啊'],['潮水', '退', '了', '就', '知道', '谁', '没', '穿', '裤子']]
     :return:
     """
-    token_emb_map = {}
+    token_emb_map = defaultdict(list)
     n = 0
     for i in range(0, len(tokens_segmented)):
 
@@ -92,6 +97,7 @@ def context_embeddings_alignment(elmo_embeddings, tokens_segmented):
                 token_emb_map[token] = [emb]
             else:
                 token_emb_map[token].append(emb)
+
             n += 1
 
     anchor_emb_map = {}
@@ -109,6 +115,41 @@ def context_embeddings_alignment(elmo_embeddings, tokens_segmented):
 
     return elmo_embeddings
 
+def context_embeddings_alignment_v1(elmo_embeddings, tokens_segmented):
+
+    """
+    Embeddings Alignment
+    :param elmo_embeddings: The embeddings from elmo
+    :param tokens_segmented: The list of tokens list
+     <class 'list'>: [['今', '天', '天气', '真', '好', '啊'],['潮水', '退', '了', '就', '知道', '谁', '没', '穿', '裤子']]
+    :return:
+    """
+    token_emb_map = defaultdict(list)
+    n = 0
+    for i in range(0, len(tokens_segmented)):
+
+        for j, token in enumerate(tokens_segmented[i]):
+
+            emb = elmo_embeddings[i][1, j, :]
+            token_emb_map[token].append(emb)
+
+            n += 1
+
+    anchor_emb_map = {}
+    for token, emb_list in token_emb_map.items():
+        average_emb = emb_list[0]
+        for j in range(1, len(emb_list)):
+            average_emb += emb_list[j]
+        average_emb /= float(len(emb_list))
+        anchor_emb_map[token] = average_emb
+
+    for i in range(0, len(elmo_embeddings)):
+        for j, token in enumerate(tokens_segmented[i]):
+            emb = anchor_emb_map[token]
+            elmo_embeddings[i][2, j, :] = emb
+
+    return elmo_embeddings
+
 def mat_division(vector_a, vector_b):
     a = vector_a.detach().numpy()
     b = vector_b.detach().numpy()
@@ -117,7 +158,7 @@ def mat_division(vector_a, vector_b):
     # if numpy.linalg.det(B) == 0:
     #     print("This matrix is singular, cannot be inversed!")
     #     return
-    return torch.from_numpy(numpy.dot(A.I,B))
+    return torch.from_numpy(np.dot(A.I,B))
 
 def get_sent_segmented(tokens):
     min_seq_len = 16
@@ -141,6 +182,13 @@ def splice_embeddings(elmo_embeddings,tokens_segmented):
     for i in range(1, len(tokens_segmented)):
         emb = elmo_embeddings[i:i + 1, :, 0:len(tokens_segmented[i]), :]
         new_elmo_embeddings = torch.cat((new_elmo_embeddings, emb), 2)
+    return new_elmo_embeddings
+
+def splice_embeddings_v1(elmo_embeddings,tokens_segmented):
+    new_elmo_embeddings = torch.from_numpy(np.array(elmo_embeddings[0][ :, 0:len(tokens_segmented[0]), :]))
+    for i in range(1, len(tokens_segmented)):
+        emb = torch.from_numpy(np.array(elmo_embeddings[i][:, 0:len(tokens_segmented[i]), :]))
+        new_elmo_embeddings = torch.cat((new_elmo_embeddings, emb), 1)
     return new_elmo_embeddings
 
 def get_effective_words_num(tokened_sents):
@@ -233,7 +281,7 @@ def get_candidate_weighted_average(tokenized_sents, weight_list, embeddings_list
 
 def get_oov_weight(tokenized_sents,word2weight,word,method="max_weight"):
 
-    word=wnl.lemmatize(word)
+    # word=wnl.lemmatize(word)
 
     if(word in word2weight):#
         return word2weight[word]

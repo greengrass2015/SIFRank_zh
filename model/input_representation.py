@@ -6,7 +6,7 @@
 from model import extractor
 from nltk.corpus import stopwords
 import thulac
-from stanfordcorenlp import StanfordCoreNLP
+# from stanfordcorenlp import StanfordCoreNLP
 stopword_dict = set(stopwords.words('english'))
 # from stanfordcorenlp import StanfordCoreNLP
 # en_model = StanfordCoreNLP(r'E:\Python_Files\stanford-corenlp-full-2018-02-27',quiet=True)

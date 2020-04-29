@@ -25,8 +25,8 @@ class WordEmbeddings():
         :return: ndarray with shape (len(sents), dimension of embeddings)
         """
 
-        elmo_embedding = self.elmo.sents2elmo(sents_tokened,output_layer=-2)
-        elmo_embedding = torch.from_numpy(np.array(elmo_embedding))
+        elmo_embedding = self.elmo.sents2elmo(sents_tokened,output_layer=-2) #list(tensor), list长度为句子的长度
+        # elmo_embedding = torch.from_numpy(np.array(elmo_embedding))
         return elmo_embedding
 
 # if __name__ == '__main__':

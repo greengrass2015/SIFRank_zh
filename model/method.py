@@ -100,7 +100,7 @@ def get_all_dist(candidate_embeddings_list, text_obj, dist_list):
     for i, emb in enumerate(candidate_embeddings_list):
         phrase = text_obj.keyphrase_candidate[i][0]
         phrase = phrase.lower()
-        phrase = wnl.lemmatize(phrase)
+        # phrase = wnl.lemmatize(phrase)
         if(phrase in dist_all):
             #store the No. and distance
             dist_all[phrase].append(dist_list[i])
@@ -143,7 +143,7 @@ def get_position_score(keyphrase_candidate_list, position_bias):
         np = kc[0]
         p = kc[1][0]
         np = np.lower()
-        np = wnl.lemmatize(np)
+        # np = wnl.lemmatize(np)
         if np in position_score:
 
             position_score[np] += 0.0
